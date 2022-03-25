@@ -1,76 +1,91 @@
-describe('Cadastro', () => {
-    context('Quando o usuário é novato', () => {
-        const user = {
-            name: 'Fernando Papito',
-            email: 'papito@samuraibs.com',
-            password: 'pwd123'
-        }
+import signupPage from '../support/pages/signup/index'
 
-        before(() => {
-            cy.task('removeUser', user.email)
-                .then((result) => {
-                    cy.log(result)
-                })
-        })
+describe('Cadastro', function () {
 
-        it('deve cadastrar um novo usuário', () => {
-            cy.visit('/signup')
-
-            cy.get('input[placeholder^="Nome"]').type(user.name)
-            cy.get('input[placeholder$="email"]').type(user.email)
-            cy.get('input[placeholder*="senha"]').type(user.password)
-
-            /* cy.intercept('POST', '/users', {
-                statusCode: 200
-            }).as('postUser') */
-
-            cy.contains('button', 'Cadastrar').click()
-
-            // cy.wait('@postUser')
-
-            cy.get('.toast')
-                .should('be.visible')
-                .find('p')
-                .should('have.text', 'Agora você se tornou um(a) Samurai, faça seu login para ver seus agendamentos!')
+    before(function () {
+        cy.fixture('signup').then(function (signup) {
+            this.success = signup.success
+            this.email_dup = signup.email_dup
+            this.email_inv = signup.email_inv
+            this.short_password = signup.short_password
         })
     })
 
-    context('Quando o e-mail já existe', () => {
-        const user = {
-            name: 'João Lucas',
-            email: 'joao@samuraibs.com',
-            password: 'pwd123',
-            is_provider: true
-        }
-
-        before(() => {
-            cy.task('removeUser', user.email)
+    context('Quando o usuário é novato', function () {
+        before(function () {
+            cy.task('removeUser', this.success.email)
                 .then((result) => {
                     cy.log(result)
                 })
+        })
 
-            cy.request(
-                'POST',
-                'http://localhost:3333/users',
-                user
-            ).then((response) => {
-                expect(response.status).to.eq(200)
+        it('deve cadastrar um novo usuário', function () {
+            signupPage.go()
+            signupPage.form(this.success)
+            signupPage.submit()
+            signupPage.toast.shouldHaveText('Agora você se tornou um(a) Samurai, faça seu login para ver seus agendamentos!')
+        })
+    })
+
+    context('Quando o e-mail já existe', function () {
+        before(function () {
+            cy.postUser(this.email_dup)
+        })
+
+        it('não deve cadastrar o usuário', function () {
+            signupPage.go()
+            signupPage.form(this.email_dup)
+            signupPage.submit()
+            signupPage.toast.shouldHaveText('Email já cadastrado para outro usuário.')
+        })
+    })
+
+    context('Quando o email é incorreto', function () {
+        it('Deve exibir mensagem de alerta', function () {
+            signupPage.go()
+            signupPage.form(this.email_inv)
+            signupPage.submit()
+            signupPage.alert.haveText('Informe um email válido')
+        })
+    })
+
+    context('Quando a senha é muito curta', function () {
+        const passwords = ['p', 'pw', 'pwd', 'pwd1', 'pwd12']
+
+        beforeEach(function () {
+            signupPage.go()
+        })
+
+        passwords.forEach(function (p) {
+            it('Não deve cadastrar com a senha: ' + p, function () {
+                this.short_password.password = p
+
+                signupPage.form(this.short_password)
+                signupPage.submit()
             })
         })
 
-        it('não deve cadastrar o usuário', () => {
-            cy.visit('/signup')
+        afterEach(function () {
+            signupPage.alert.haveText('Pelo menos 6 caracteres')
+        })
+    })
 
-            cy.get('input[placeholder^="Nome"]').type(user.name)
-            cy.get('input[placeholder$="email"]').type(user.email)
-            cy.get('input[placeholder*="senha"]').type(user.password)
+    context('Quando não preencho nenhum dos campos', () => {
+        const alertMessages = [
+            'Nome é obrigatório',
+            'E-mail é obrigatório',
+            'Senha é obrigatória'
+        ]
 
-            cy.contains('button', 'Cadastrar').click()
+        before(() => {
+            signupPage.go()
+            signupPage.submit()
+        })
 
-            cy.get('.toast')
-                .should('be.visible')
-                .find('p')
-                .should('have.text', 'Email já cadastrado para outro usuário.')
+        alertMessages.forEach((alert) => {
+            it('Deve exibir: ' + alert, () => {
+                signupPage.alert.haveText(alert)
+            })
         })
     })
 })
