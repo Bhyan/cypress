@@ -36,6 +36,21 @@ module.exports = (on, config) => {
           resolver({ success: result })
         })
       })
+    },
+    findToken(email) {
+      return new Promise((resolver) => {
+        pool.query('SELECT B.token FROM ' +
+          'public.users A ' +
+          'INNER JOIN public.user_tokens B ' +
+          'ON A.id = B.user_id ' +
+          'WHERE A.email = $1 ' +
+          'ORDER BY B.created_at', [email], (error, result) => {
+            if (error) {
+              throw error
+            }
+            resolver({ token: result.rows[0].token })
+          })
+      })
     }
   })
 }
